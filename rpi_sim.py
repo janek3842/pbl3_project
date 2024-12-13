@@ -102,6 +102,9 @@ def limit_control(sensors):
     # Returning the state of values/limits in the room
     return control
 
+# Function taking photos from every camera and sending to the server
+def photo_update():
+    return
 
 sensors = []
 sensors.append(Sensor(1))

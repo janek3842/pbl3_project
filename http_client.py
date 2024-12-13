@@ -1,7 +1,7 @@
 import requests
 import json
 
-# Function responsible for putting the temperature, humidity and smoke level
+# Function for putting the temperature, humidity and smoke level
 # measured by the given device in given room
 def send_measurements(base_url, room_id, device_id, temp, hum, smoke):
     # Defining data and headers
@@ -24,7 +24,7 @@ def send_measurements(base_url, room_id, device_id, temp, hum, smoke):
     else:
         print(f"Failed to send data, response {response.json()}")
 
-# Function responsible for posting a photo taken in the given room by the given camera
+# Function for posting a photo taken in the given room by the given camera
 def send_photo(base_url, room_id, camera_id, file_path):
     # Parsing destination url
     dest_url = base_url + "/rooms/" + str(room_id) + "/cameras/" + str(camera_id) + "/data"
@@ -40,6 +40,7 @@ def send_photo(base_url, room_id, camera_id, file_path):
     else:
         print(f"Failed to send data, response {response.json()}")
 
+# Function for getting info on limits
 def get_limits(base_url, room_id, device_id):
     # Parsing destination url
     dest_url = base_url + "/rooms/" + str(room_id) + "/sensor-devices/" + str(device_id) + "/limits"
@@ -59,8 +60,27 @@ def get_limits(base_url, room_id, device_id):
         print("Can't process the response as JSON")
         return None
 
+# Function for getting sensor device ids
 def get_device_ids(base_url, room_id):
     dest_url = base_url + "/rooms/" + str(room_id) + "/sensor-devices"
+    try:
+        # Sending request
+        response = requests.get(dest_url, timeout=10)
+        response.raise_for_status()
+        # Returning data if successfully received
+        data = response.json()
+        return data
+    # Checking for exceptions
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to get limits, response {e}")
+        return None
+    except ValueError:
+        print("Can't process the response as JSON")
+        return None
+
+# Function for getting camera ids
+def get_camera_ids(base_url, room_id):
+    dest_url = base_url + "/rooms/" + str(room_id) + "/cameras"
     try:
         # Sending request
         response = requests.get(dest_url, timeout=10)
