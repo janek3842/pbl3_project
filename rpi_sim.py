@@ -88,9 +88,19 @@ def update_sensor_values(sensors, values_json):
     # Return updated sensor list
     return sensors
 
-# Function returning the
+# Function controlling the exceeding of limits in the room (0 - good, 1 - warning, 2 - limits exceeded)
 def limit_control(sensors):
-    return
+    control = 0
+    # Checking if any sensors exceed the given limits
+    for sensor in sensors:
+        if sensor.is_close():
+            if not sensor.is_exceeded():
+                control = 1
+            else:
+                control = 2
+                return control
+    # Returning the state of values/limits in the room
+    return control
 
 
 sensors = []
