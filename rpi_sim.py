@@ -1,5 +1,6 @@
 import http_client
 from http_client import get_device_ids, get_limits
+import cv2
 
 base_url = "http://13.60.19.183:1883"
 room_id = 1
@@ -103,8 +104,23 @@ def limit_control(sensors):
     return control
 
 # Function taking photos from every camera and sending to the server
-def photo_update():
+def photo_update(sensors):
     return
+
+# Function for capturing image from rpi camera
+def photo_capture(camera_id):
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        print("Error: could not open camera")
+        return
+    else:
+        ret, frame = cap.read()
+        if ret:
+            cv2.imwrite(camera_id+".jpg", frame)
+        else:
+            print("Error: failed to capture image")
+        cap.release()
+        return
 
 sensors = []
 sensors.append(Sensor(1))
