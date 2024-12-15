@@ -1,9 +1,10 @@
 import requests
 import json
 
-# Function for putting the temperature, humidity and smoke level
-# measured by the given device in given room
+
 def send_measurements(base_url, room_id, device_id, temp, hum, smoke):
+    """Function for putting the temperature, humidity and smoke level
+        measured by the given device in given room"""
     # Defining data and headers
     data = {
         "temperature": temp,
@@ -21,29 +22,36 @@ def send_measurements(base_url, room_id, device_id, temp, hum, smoke):
     # Checking response code
     if response.status_code == 200:
         print(f"Data sent successfully, response {response.json()}")
+        return
     else:
         print(f"Failed to send data, response {response.json()}")
+        return
 
-# Function for posting a photo taken in the given room by the given camera
 def send_photo(base_url, room_id, camera_id, file_path):
+    """Function for posting a photo taken in the given room by the given camera"""
     # Parsing destination url
-    dest_url = base_url + "/rooms/" + str(room_id) + "/cameras/" + str(camera_id) + "/data"
+    dest_url = base_url + "/rooms/" + str(room_id) + "/cameras/" + str(camera_id) + "/images"
 
-    # Opening file
-    with open(file_path, "rb") as file:
-        # Sending request
-        response = requests.post(dest_url, files={"file": file})
+    try:
+        # Opening file
+        with open(file_path, "rb") as file:
+            # Sending request
+            response = requests.post(dest_url, files={"file": file})
+    except Exception as e:
+        print(f"Couldn't send photo, error: {e}")
 
     # Checking response code
     if response.status_code == 200:
         print(f"Data sent successfully, response {response.json()}")
+        return
     else:
         print(f"Failed to send data, response {response.json()}")
+        return
 
-# Function for getting info on limits
-def get_limits(base_url, room_id, device_id):
+def get_limits(base_url, room_id):
+    """Function for getting info on limits"""
     # Parsing destination url
-    dest_url = base_url + "/rooms/" + str(room_id) + "/sensor-devices/" + str(device_id) + "/limits"
+    dest_url = base_url + "/rooms/" + str(room_id) + "/sensor-devices/limits"
 
     try:
         # Sending request
@@ -51,6 +59,7 @@ def get_limits(base_url, room_id, device_id):
         response.raise_for_status()
         # Returning data if successfully received
         data = response.json()
+        print(data)
         return data
     # Checking for exceptions
     except requests.exceptions.RequestException as e:
@@ -60,8 +69,27 @@ def get_limits(base_url, room_id, device_id):
         print("Can't process the response as JSON")
         return None
 
-# Function for getting sensor device ids
+def get_people_number(base_url, room_id, camera_id):
+    """Function for getting people number limit"""
+    dest_url = base_url + "/rooms/" + str(room_id) + "/cameras/" + str(camera_id) + "/people-num"
+    try:
+        # Sending request
+        response = requests.get(dest_url, timeout=10)
+        response.raise_for_status()
+        # Returning data if successfully received
+        data = response.json()
+        print(data)
+        return data["data"]["people_num"]
+    # Checking for exceptions
+    except requests.exceptions.RequestException as e:
+        print(f"Failed to get people number, response {e}")
+        return None
+    except ValueError:
+        print("Can't process the response")
+        return None
+
 def get_device_ids(base_url, room_id):
+    """Function for getting sensor device ids"""
     dest_url = base_url + "/rooms/" + str(room_id) + "/sensor-devices"
     try:
         # Sending request
@@ -69,6 +97,7 @@ def get_device_ids(base_url, room_id):
         response.raise_for_status()
         # Returning data if successfully received
         data = response.json()
+        print(data)
         return data
     # Checking for exceptions
     except requests.exceptions.RequestException as e:
@@ -78,8 +107,8 @@ def get_device_ids(base_url, room_id):
         print("Can't process the response as JSON")
         return None
 
-# Function for getting camera ids
 def get_camera_ids(base_url, room_id):
+    """Function for getting camera ids"""
     dest_url = base_url + "/rooms/" + str(room_id) + "/cameras"
     try:
         # Sending request
