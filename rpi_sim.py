@@ -2,6 +2,7 @@ from http_client import get_device_ids, get_limits, send_photo, send_measurement
 import cv2
 from mqtt_client import mqtt_get_measurements
 import time
+from functools import wraps
 
 # Predefined room and camera id's
 ROOM_ID = "A"
@@ -16,8 +17,9 @@ BASE_URL = "http://13.60.171.70:1880"
 # MQTT broker
 BROKER = "localhost"
 
-# Sensor class
+
 class Sensor:
+    """Class for storing the attributes of the sensor"""
     class Attribute:
         def __init__(self, name, value, limit):
             self.name = name
@@ -61,7 +63,9 @@ class Sensor:
     def __str__(self):
         return f"sensor {self.id}\n {self.temp}\n {self.hum}\n {self.smoke}\n is exceeded? {self.is_exceeded()}"
 
+
 class People:
+    """Class for storing the number and limit of people"""
     def __init__(self):
         self.num = 0
         self.limit = 10
@@ -72,57 +76,91 @@ class People:
     def is_exceeded(self):
         return self.num > self.limit
 
+
+def retry(max_attemps, delay):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            attemps = 0
+            while attemps < max_attemps:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    attemps += 1
+                    print(f"Attempt no. {attemps} failed: {e}, retrying")
+                    time.sleep(delay)
+            print(f"All {max_attemps} attemps failed")
+            return None
+        return wrapper
+    return decorator
+
+
 def update_sensor_list(sensors):
     """Function for checking changes in the sensors on the server and adding/deleting devices"""
-    # Creating list of sensor ids
-    sensor_ids = [sensor.id for sensor in sensors]
-    # Retrieving device list from server
-    data = get_device_ids(BASE_URL, ROOM_ID)
-    # Creating a list of all device ids from the received json
-    updated_sensor_ids = []
-    devices = data["sensor_devices"]
-    for device in devices:
-        updated_sensor_ids.append(device["device_id"])
+    try:
+        # Creating list of sensor ids
+        sensor_ids = [sensor.id for sensor in sensors]
+        # Retrieving device list from server
+        data = get_device_ids(BASE_URL, ROOM_ID)
+        # Creating a list of all device ids from the received json
+        updated_sensor_ids = []
+        devices = data["sensor_devices"]
+        for device in devices:
+            updated_sensor_ids.append(device["device_id"])
 
-    # Determining added and deleted sensors
-    sensor_ids_set = set(sensor_ids)
-    updated_sensor_ids_set = set(updated_sensor_ids)
-    deleted_sensor_ids = sensor_ids_set - updated_sensor_ids_set
-    added_sensor_ids = updated_sensor_ids_set - sensor_ids_set
+        # Determining added and deleted sensors
+        sensor_ids_set = set(sensor_ids)
+        updated_sensor_ids_set = set(updated_sensor_ids)
+        deleted_sensor_ids = sensor_ids_set - updated_sensor_ids_set
+        added_sensor_ids = updated_sensor_ids_set - sensor_ids_set
 
-    # Updating sensor list
-    updated_sensors = [sensor for sensor in sensors if sensor.id not in deleted_sensor_ids]
-    for new_sensor_id in added_sensor_ids:
-        updated_sensors.append(Sensor(new_sensor_id))
+        # Updating sensor list
+        updated_sensors = [sensor for sensor in sensors if sensor.id not in deleted_sensor_ids]
+        for new_sensor_id in added_sensor_ids:
+            updated_sensors.append(Sensor(new_sensor_id))
+        # Returning the updated list
+        return updated_sensors
+    except Exception as e:
+        print(f"Couldn't update sensor values, error: {e}, returning old values")
+        return None
 
-    # Returning the updated list
-    return updated_sensors
 
 def update_sensor_limits(sensors):
     """Function for updating sensor limits based on server data"""
     # Updating limits for every sensor
     limits_json = get_limits(BASE_URL, ROOM_ID)
-    for sensor in sensors:
-        sensor.update_all_limits(limits_json)
-    ppl_limit = limits_json["people_num"]
-    # Return updated sensor list
-    return sensors, ppl_limit
+    if limits_json is None:
+        print("Couldn't access the limit values")
+        return None
+    try:
+        for sensor in sensors:
+            sensor.update_all_limits(limits_json)
+        ppl_limit = limits_json["people_num"]
+        # Return updated sensor list
+        return sensors, ppl_limit
+    except Exception as e:
+        print(f"Couldn't update sensor limits, error: {e}, returned old limits")
+        return None
+
 
 def update_sensor_values(sensors, values_json):
-    """Function for updating sensor values from the given value (hujowa trzeba zmienic)"""
-    print(values_json)
-    for sensor in sensors:
-        if sensor.id not in values_json:
-            print(f"No data from device {sensor.id}")
-        else:
-            try:
-                sensor.update_all_values(values_json[sensor.id])
-                sensor.device_state = True
-                send_measurements(BASE_URL, ROOM_ID, sensor.id, sensor.temp.value, sensor.hum.value, sensor.smoke.value)
-            except Exception as e:
-                print(f"Couldn't update {sensor.id} data, error {e}")
-                sensor.device_state = False
-
+    """Function for updating sensor values from the given value"""
+    try:
+        print(values_json)
+        for sensor in sensors:
+            if sensor.id not in values_json:
+                print(f"No data from device {sensor.id}")
+            else:
+                try:
+                    sensor.update_all_values(values_json[sensor.id])
+                    sensor.device_state = True
+                    send_measurements(BASE_URL, ROOM_ID, sensor.id, sensor.temp.value, sensor.hum.value, sensor.smoke.value)
+                except Exception as e:
+                    print(f"Couldn't update {sensor.id} data, error {e}")
+                    sensor.device_state = False
+    except Exception as e:
+        print(f"Couldn't update sensor values, error: {e}, returned old values")
+        return None
     # Return updated sensor list
     return sensors
 
@@ -148,30 +186,40 @@ def limit_control(sensors, people):
     else:
         return 0
 
+
 def photo_capture(camera_id):
     """Function for capturing image from rpi camera"""
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Error: could not open camera")
-        return
+        return None
     else:
         ret, frame = cap.read()
         if ret:
             cv2.imwrite(camera_id+".jpg", frame)
         else:
             print("Error: failed to capture image")
+            return None
         cap.release()
         return
 
+
 def photo_update(camera_id):
     """Function taking photo from camera and sending it to the server"""
-    photo_capture(camera_id)
-    send_photo(BASE_URL, ROOM_ID, camera_id, camera_id+".jpg")
+    try:
+        photo_capture(camera_id)
+        send_photo(BASE_URL, ROOM_ID, camera_id, camera_id+".jpg")
+        return
+    except Exception as e:
+        print(f"Couldn't update photo, error: {e}")
+        return None
+
 
 def sensors_info(sensors):
     """Debugginf function for printing out sensor info"""
     for sensor in sensors:
         print(sensor)
+
 
 def main():
     sensors = []
@@ -182,24 +230,34 @@ def main():
         meas_json = mqtt_get_measurements(BROKER, ROOM_ID)
 
         # Check for changes in sensor list coming from the website
-        sensors = update_sensor_list(sensors)
+        sensors = update_sensor_list(sensors) or sensors
+
         # Update sensor limits from website
-        sensors, ppl.limit = update_sensor_limits(sensors)
-        # Update previously measured sensor values and sending them to the server and database
-        update_sensor_values(sensors, meas_json)
+        sensors, ppl.limit = update_sensor_limits(sensors) or sensors, ppl.limit
+
+        # If didn't receive sensor measurements, don't update values on server
+        if meas_json is None:
+            print("Error receiving data from sensors, can't update values on server")
+        else:
+            # Update previously measured sensor values and sending them to the server and database
+            sensors = update_sensor_values(sensors, meas_json) or sensors
+
         # Take and update photo
         photo_update(CAMERA_ID)
+
         # Get people number from server
-        ppl.num = get_people_number(BASE_URL, ROOM_ID, CAMERA_ID)
+        ppl.num = get_people_number(BASE_URL, ROOM_ID, CAMERA_ID) or ppl.num
 
         # Print all sensor info (for testing)
         sensors_info(sensors)
+
         # Printing door state to simulate the LED/gate
         door_state = limit_control(sensors, ppl)
         print(f"door state: {door_state}")
 
         # Wait before the next measurements
         time.sleep(WAIT_TIMES[door_state])
+
 
 if __name__ == "__main__":
     main()

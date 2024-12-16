@@ -1,7 +1,9 @@
 import requests
 import json
+from rpi_sim import retry
 
 
+@retry(max_attemps=3, delay=5)
 def send_measurements(base_url, room_id, device_id, temp, hum, smoke):
     """Function for putting the temperature, humidity and smoke level
         measured by the given device in given room"""
@@ -27,6 +29,8 @@ def send_measurements(base_url, room_id, device_id, temp, hum, smoke):
         print(f"Failed to send data, response {response.json()}")
         return
 
+
+@retry(max_attemps=3, delay=5)
 def send_photo(base_url, room_id, camera_id, file_path):
     """Function for posting a photo taken in the given room by the given camera"""
     # Parsing destination url
@@ -48,6 +52,8 @@ def send_photo(base_url, room_id, camera_id, file_path):
         print(f"Failed to send data, response {response.json()}")
         return
 
+
+@retry(max_attemps=3, delay=5)
 def get_limits(base_url, room_id):
     """Function for getting info on limits"""
     # Parsing destination url
@@ -69,6 +75,8 @@ def get_limits(base_url, room_id):
         print("Can't process the response as JSON")
         return None
 
+
+@retry(max_attemps=3, delay=5)
 def get_people_number(base_url, room_id, camera_id):
     """Function for getting people number limit"""
     dest_url = base_url + "/rooms/" + str(room_id) + "/cameras/" + str(camera_id) + "/people-num"
@@ -88,6 +96,8 @@ def get_people_number(base_url, room_id, camera_id):
         print("Can't process the response")
         return None
 
+
+@retry(max_attemps=3, delay=5)
 def get_device_ids(base_url, room_id):
     """Function for getting sensor device ids"""
     dest_url = base_url + "/rooms/" + str(room_id) + "/sensor-devices"
@@ -107,6 +117,8 @@ def get_device_ids(base_url, room_id):
         print("Can't process the response as JSON")
         return None
 
+
+@retry(max_attemps=3, delay=5)
 def get_camera_ids(base_url, room_id):
     """Function for getting camera ids"""
     dest_url = base_url + "/rooms/" + str(room_id) + "/cameras"
